@@ -7,7 +7,7 @@
 #define NTP_PORT 123
 #define NTPD_DELAY 100 //msec
 #define NTP_PACKET_SIZE 48
-#define NTP_STRATUM 0b00000010
+#define NTP_STRATUM 2
 #define SECONDS_FROM_1900_TO_1970  2208988800UL
 
 timeval last_ntpsync;
@@ -23,46 +23,46 @@ void fillTimeval(byte* buff, uint32_t secs, uint32_t usecs, uint8_t startpt) {
   buff[startpt+7] = usecs & 0xFF;  
 }
 
-void buildNTPpacket(byte* packetBuffer)
+void buildNTPpacket(byte* packet)
 {
   timeval now;
   gettimeofday(&now, NULL);
   
-  packetBuffer[0] = 0b00011100; // LI: 0, version: 3, mode: 4
-  packetBuffer[1] = NTP_STRATUM;  // stratum
-  packetBuffer[2] = 4; // polling interval
-  packetBuffer[3] = 0xF7; // clock precision
+  packet[0] = 0b00011100; // LI: 0, version: 3, mode: 4
+  packet[1] = NTP_STRATUM;  // stratum
+  packet[2] = 4; // polling interval
+  packet[3] = 0xF7; // clock precision
   
-  packetBuffer[4] = 0; // root delay
-  packetBuffer[5] = 0;
-  packetBuffer[6] = 0;
-  packetBuffer[7] = 0;
+  packet[4] = 0; // root delay
+  packet[5] = 0;
+  packet[6] = 0;
+  packet[7] = 0;
   
-  packetBuffer[8] = 0; // root dispersion
-  packetBuffer[9] = 0;
-  packetBuffer[10] = 0;
-  packetBuffer[11] = 0x50;
+  packet[8] = 0; // root dispersion
+  packet[9] = 0;
+  packet[10] = 0;
+  packet[11] = 0x50;
   
-  packetBuffer[12] = 69; //E //time source (namestring)
-  packetBuffer[13] = 83; //S
-  packetBuffer[14] = 80; //P
-  packetBuffer[15] = 0;
+  packet[12] = 69; //E //time source (namestring)
+  packet[13] = 83; //S
+  packet[14] = 80; //P
+  packet[15] = 0;
   
   //reference time is last sync
   uint32_t rSec = last_ntpsync.tv_sec + SECONDS_FROM_1900_TO_1970;
-  fillTimeval(packetBuffer, rSec, last_ntpsync.tv_usec, 16);
+  fillTimeval(packet, rSec, last_ntpsync.tv_usec, 16);
   
   //copy client xmit time to originate
-  for (int i = 24; i < 32; i++) packetBuffer[i] = packetBuffer[i-8];
+  for (int i = 24; i < 32; i++) packet[i] = packet[i+16];
   
   //put initial time into receive
   rSec = now.tv_sec + SECONDS_FROM_1900_TO_1970;
-  fillTimeval(packetBuffer, rSec, now.tv_usec, 32);
+  fillTimeval(packet, rSec, now.tv_usec, 32);
   
   //put final time into xmit
   gettimeofday(&now, NULL);
   rSec = now.tv_sec + SECONDS_FROM_1900_TO_1970;
-  fillTimeval(packetBuffer, rSec, now.tv_usec, 40);
+  fillTimeval(packet, rSec, now.tv_usec, 40);
   log_d("sent time: %d.%d",now.tv_sec,now.tv_usec); 
 }
 
@@ -95,7 +95,6 @@ void timesync_cb(struct timeval *tv) {
 
 void setup() {
   Serial.begin(115200);
-  delay(20);
   Serial.println();
   WiFi.begin();
   if (!WiFi.waitForConnectResult()) {
